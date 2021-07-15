@@ -1,9 +1,8 @@
 package com.github.ka.micrometer.prometheus.fix.fix;
 
 import io.micrometer.core.instrument.Clock;
-import io.micrometer.prometheus.MultiTagMicrometerCollector;
-import io.micrometer.prometheus.MultiTagPrometheusMeterRegistry;
 import io.micrometer.prometheus.PrometheusConfig;
+import io.micrometer.prometheus.MultiTagPrometheusMeterRegistry;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.common.TextFormat;
 import org.junit.jupiter.api.Assertions;

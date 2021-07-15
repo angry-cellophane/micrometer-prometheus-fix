@@ -22,7 +22,6 @@ import io.prometheus.client.Collector;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -33,19 +32,40 @@ import static java.util.stream.Collectors.toList;
  * @author Jon Schneider
  * @author Johnny Lim
  */
-public class MultiTagMicrometerCollector extends Collector implements Collector.Describable {
+class MultiTagMicrometerCollector extends Collector implements Collector.Describable {
 
-    interface Child {
-        Stream<MicrometerCollector.Family> samples(String conventionName, TagsHolder tags);
-    }
-
-    static class TagsHolder {
+    static final class TagsHolder {
         final List<String> keys;
         final List<String> values;
 
-        public TagsHolder(List<String> keys, List<String> values) {
-            this.keys = List.copyOf(Objects.requireNonNull(keys, "keys"));
-            this.values = List.copyOf(Objects.requireNonNull(values, "values"));
+        private TagsHolder(List<String> keys, List<String> values) {
+            this.keys = keys;
+            this.values = values;
+        }
+
+        static TagsHolder from(List<Tag> tags) {
+            Objects.requireNonNull(tags, "tags");
+
+            List<String> keys = new ArrayList<>(tags.size());
+            List<String> values = new ArrayList<>(tags.size());
+
+            for (Tag tag : tags) {
+                keys.add(tag.getKey());
+                values.add(tag.getValue());
+            }
+
+            return new TagsHolder(
+                    Collections.unmodifiableList(keys),
+                    Collections.unmodifiableList(values)
+            );
+        }
+
+        public List<String> getKeys() {
+            return keys;
+        }
+
+        public List<String> getValues() {
+            return values;
         }
 
         @Override
@@ -74,18 +94,11 @@ public class MultiTagMicrometerCollector extends Collector implements Collector.
     }
 
     public void add(List<Tag> tags, Child child) {
-        children.put(toHolder(tags), child);
+        children.put(TagsHolder.from(tags), child);
     }
 
     public void remove(List<Tag> tags) {
-        children.remove(toHolder(tags));
-    }
-
-    private TagsHolder toHolder(List<Tag> tags) {
-        return new TagsHolder(
-                tags.stream().map(Tag::getKey).collect(Collectors.toUnmodifiableList()),
-                tags.stream().map(Tag::getValue).collect(Collectors.toUnmodifiableList())
-        );
+        children.remove(TagsHolder.from(tags));
     }
 
     public boolean isEmpty() {
@@ -94,11 +107,11 @@ public class MultiTagMicrometerCollector extends Collector implements Collector.
 
     @Override
     public List<MetricFamilySamples> collect() {
-        Map<String, MicrometerCollector.Family> families = new HashMap<>();
+        Map<String, Family> families = new HashMap<>();
 
-        for (Map.Entry<TagsHolder, Child> entry : children.entrySet()) {
-            var tags = entry.getKey();
-            var child = entry.getValue();
+        for (Map.Entry<TagsHolder, Child> e : children.entrySet()) {
+            TagsHolder tags = e.getKey();
+            Child child = e.getValue();
 
             child.samples(conventionName, tags).forEach(family -> {
                 families.compute(family.getConventionName(), (name, matchingFamily) -> matchingFamily != null ?
@@ -136,6 +149,37 @@ public class MultiTagMicrometerCollector extends Collector implements Collector.
             default:
                 return Collections.singletonList(
                         new MetricFamilySamples(conventionName, Type.UNKNOWN, help, Collections.emptyList()));
+        }
+    }
+
+    interface Child {
+        Stream<Family> samples(String conventionName, TagsHolder tags);
+    }
+
+    static class Family {
+        final Type type;
+        final String conventionName;
+        final List<MetricFamilySamples.Sample> samples = new ArrayList<>();
+
+        Family(Type type, String conventionName, MetricFamilySamples.Sample... samples) {
+            this.type = type;
+            this.conventionName = conventionName;
+            Collections.addAll(this.samples, samples);
+        }
+
+        Family(Type type, String conventionName, Stream<MetricFamilySamples.Sample> samples) {
+            this.type = type;
+            this.conventionName = conventionName;
+            samples.forEach(this.samples::add);
+        }
+
+        String getConventionName() {
+            return conventionName;
+        }
+
+        Family addSamples(Collection<MetricFamilySamples.Sample> samples) {
+            this.samples.addAll(samples);
+            return this;
         }
     }
 }
