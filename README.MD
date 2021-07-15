@@ -21,6 +21,7 @@ counter_total{code="500",type="error",version="1",} 1.0
 ### Is it safe to use?
 Yes, absolutely. No metric gets dropped quietly, output format is valid and parsable by prometheus.
 
+
 ### What if I want to use it now?
 
 Copy the classes under the [`io.micrometer.prometheus`](./src/main/java/io/micrometer/prometheus) package into your project.
