@@ -18,6 +18,7 @@ counter_total{type="success",version="1",} 1.0
 counter_total{code="500",type="error",version="1",} 1.0
 ```
 
+
 ### Is it safe to use?
 Yes, absolutely. No metric gets dropped quietly, output format is valid and parsable by prometheus.
 
